@@ -959,7 +959,7 @@ function getHandPosition(lm, idx) {
 // GESTURE INFO
 // ============================================================
 const GESTURE_INFO = {
-  'none':       { emoji: '🌌', name: 'Happy Birthday Rosy', desc: '张开手掌 · 握拳 · 捏合 · 食指指向 · 剪刀手' },
+  'none':       { emoji: '🌌', name: 'Happy Birthday Rosy', desc: '鼠标拖动排斥 · 摄像头手势交互 · 剪刀手切换形态' },
   'open_palm':  { emoji: '✋', name: '排斥力场', desc: '掌心产生斥力，粒子向外扩散爆炸' },
   'fist':       { emoji: '✊', name: '引力吸引', desc: '粒子向掌心聚集，加速自旋 · 点燃蜡烛🔥' },
   'pinch':      { emoji: '🤏', name: '引力奇点', desc: '所有粒子被吸引到指尖' },
@@ -973,6 +973,95 @@ function updateGestureUI(gesture) {
   document.getElementById('gesture-name').textContent = info.name;
   document.getElementById('gesture-desc').textContent = info.desc;
 }
+
+// ============================================================
+// MOUSE / TOUCH INTERACTION (fallback when no camera gesture)
+// ============================================================
+const mouse = { x: 0, y: 0, worldX: 0, worldY: 0, worldZ: 0, pressed: false, active: false };
+const raycaster = new THREE.Raycaster();
+const interactPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+
+function updateMouseWorldPos() {
+  if (!camera) return;
+  raycaster.setFromCamera({ x: mouse.x, y: mouse.y }, camera);
+  const target = new THREE.Vector3();
+  const ray = raycaster.ray;
+  const denom = ray.direction.dot(interactPlane.normal);
+  if (Math.abs(denom) > 0.0001) {
+    const t = -(ray.origin.dot(interactPlane.normal) + interactPlane.constant) / denom;
+    if (t > 0) {
+      ray.at(t, target);
+      mouse.worldX = target.x;
+      mouse.worldY = target.y;
+      mouse.worldZ = target.z;
+    }
+  }
+}
+
+function onMouseDown(e) {
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  mouse.pressed = true;
+  mouse.active = true;
+  updateMouseWorldPos();
+  previousGesture = currentGesture;
+  currentGesture = mouseGesture;
+  updateGestureUI(mouseGesture);
+}
+
+function onMouseMove(e) {
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  if (mouse.pressed) updateMouseWorldPos();
+}
+
+function onMouseUp() {
+  mouse.pressed = false;
+  mouse.active = false;
+  previousGesture = currentGesture;
+  currentGesture = 'none';
+  updateGestureUI('none');
+}
+
+function onTouchStart(e) {
+  e.preventDefault();
+  const t = e.touches[0];
+  mouse.x = (t.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(t.clientY / window.innerHeight) * 2 + 1;
+  mouse.pressed = true;
+  mouse.active = true;
+  updateMouseWorldPos();
+  previousGesture = currentGesture;
+  currentGesture = mouseGesture;
+  updateGestureUI(mouseGesture);
+}
+
+function onTouchMove(e) {
+  e.preventDefault();
+  const t = e.touches[0];
+  mouse.x = (t.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(t.clientY / window.innerHeight) * 2 + 1;
+  if (mouse.pressed) updateMouseWorldPos();
+}
+
+function onTouchEnd(e) {
+  e.preventDefault();
+  mouse.pressed = false;
+  mouse.active = false;
+  previousGesture = currentGesture;
+  currentGesture = 'none';
+  updateGestureUI('none');
+}
+
+const mouseGesture = 'open_palm';
+
+renderer.domElement.addEventListener('mousedown', onMouseDown);
+renderer.domElement.addEventListener('mousemove', onMouseMove);
+renderer.domElement.addEventListener('mouseup', onMouseUp);
+renderer.domElement.addEventListener('mouseleave', onMouseUp);
+renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false });
+renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: false });
+renderer.domElement.addEventListener('touchend', onTouchEnd, { passive: false });
 
 // ============================================================
 // HAND DRAWING
@@ -1085,13 +1174,22 @@ setTimeout(() => {
 // INTERACTION / FORCES
 // ============================================================
 function applyForces() {
-  if (!handLandmarks || currentGesture === 'none') return;
+  // Try hand gesture first, fall back to mouse/touch
+  const useMouse = mouse.active && (!handLandmarks || currentGesture === 'none');
+  const gesture = useMouse ? 'open_palm' : currentGesture;
+  if (gesture === 'none') return;
+  if (!useMouse && (!handLandmarks || gesture === 'none')) return;
 
-  const palm = getHandPosition(handLandmarks, 9);
+  let cx, cy, cz;
+  if (useMouse) {
+    cx = mouse.worldX; cy = mouse.worldY; cz = mouse.worldZ;
+  } else {
+    const palm = getHandPosition(handLandmarks, 9);
+    cx = palm.x; cy = palm.y; cz = palm.z;
+  }
 
-  switch (currentGesture) {
+  switch (gesture) {
     case 'open_palm': {
-      const cx = palm.x, cy = palm.y, cz = palm.z;
       for (let i = 0; i < N; i++) {
         const dx = pos[i * 3] - cx;
         const dy = pos[i * 3 + 1] - cy;
@@ -1106,7 +1204,6 @@ function applyForces() {
     }
 
     case 'fist': {
-      const cx = palm.x, cy = palm.y, cz = palm.z;
       for (let i = 0; i < N; i++) {
         const dx = cx - pos[i * 3];
         const dy = cy - pos[i * 3 + 1];
@@ -1125,6 +1222,7 @@ function applyForces() {
     }
 
     case 'pinch': {
+      if (useMouse) break; // pinch not available via mouse
       const t = getHandPosition(handLandmarks, 4);
       const i = getHandPosition(handLandmarks, 8);
       const px = (t.x + i.x) / 2;
@@ -1144,6 +1242,7 @@ function applyForces() {
     }
 
     case 'point': {
+      if (useMouse) break; // point not available via mouse
       const wrist = getHandPosition(handLandmarks, 0);
       const idxTip = getHandPosition(handLandmarks, 8);
       const dirX = idxTip.x - wrist.x;
@@ -1208,12 +1307,15 @@ function animate() {
 
   if (handLandmarks) {
     const detected = recognizeGesture(handLandmarks);
-    if (gestureCooldown <= 0 && detected === 'peace' && previousGesture !== 'peace') {
-      switchMorphology();
-      gestureCooldown = 30;
+    // Don't override mouse/touch gesture
+    if (detected !== 'none' || !mouse.active) {
+      if (gestureCooldown <= 0 && detected === 'peace' && previousGesture !== 'peace') {
+        switchMorphology();
+        gestureCooldown = 30;
+      }
+      currentGesture = detected;
     }
-    currentGesture = detected;
-  } else {
+  } else if (!mouse.active) {
     currentGesture = 'none';
   }
   if (gestureCooldown > 0) gestureCooldown--;
