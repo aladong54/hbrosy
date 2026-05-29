@@ -1,0 +1,1669 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>🌌 Happy Birthday Rosy · 3D 粒子宇宙</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100vw; min-height: 100vh;
+  overflow: hidden;
+  background: #000;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  position: fixed; inset: 0;
+}
+#three-container {
+  position: fixed; top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  z-index: 0;
+}
+/* Fullscreen hint */
+#fullscreen-btn {
+  position: fixed; bottom: 24px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.5);
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-size: 12px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: all 0.3s;
+  pointer-events: auto;
+  user-select: none;
+  font-family: inherit;
+}
+#fullscreen-btn:hover {
+  background: rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.8);
+}
+/* Music button */
+#music-btn {
+  position: fixed; bottom: 24px; left: 50%;
+  transform: translateX(-50%) translateY(38px);
+  z-index: 10;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.35);
+  padding: 5px 14px;
+  border-radius: 14px;
+  font-size: 11px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: all 0.3s;
+  pointer-events: auto;
+  user-select: none;
+  font-family: inherit;
+}
+#music-btn:hover {
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.7);
+}
+/* Gesture info - top left */
+#gesture-ui {
+  position: fixed; top: 24px; left: 24px;
+  z-index: 10;
+  color: #fff;
+  pointer-events: none;
+  user-select: none;
+}
+#gesture-name {
+  font-size: 28px; font-weight: 700;
+  text-shadow: 0 0 20px rgba(255,150,50,0.6), 0 0 60px rgba(255,100,0,0.3);
+  letter-spacing: 2px;
+  margin-bottom: 6px;
+  transition: opacity 0.3s;
+}
+#gesture-desc {
+  font-size: 14px;
+  opacity: 0.6;
+  text-shadow: 0 0 10px rgba(0,0,0,0.8);
+  letter-spacing: 1px;
+}
+#gesture-emoji {
+  font-size: 36px;
+  margin-bottom: 4px;
+}
+/* Camera container - bottom right */
+#camera-container {
+  position: fixed; bottom: 24px; right: 24px;
+  width: 200px; height: 150px;
+  border-radius: 12px;
+  overflow: hidden;
+  z-index: 10;
+  border: 1px solid rgba(255,255,255,0.15);
+  box-shadow: 0 4px 30px rgba(0,0,0,0.5);
+  background: #111;
+}
+#camera-container video {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+  display: block;
+}
+#camera-container canvas {
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 100%;
+  transform: scaleX(-1);
+}
+.camera-label {
+  position: absolute; bottom: 6px; left: 8px;
+  font-size: 10px; color: rgba(255,255,255,0.4);
+  letter-spacing: 1px; z-index: 2;
+  text-shadow: 0 0 4px #000;
+}
+/* FPS counter */
+#fps {
+  position: fixed; bottom: 24px; left: 24px;
+  color: rgba(255,255,255,0.3);
+  font-size: 11px; font-family: monospace;
+  z-index: 10; pointer-events: none;
+}
+/* Loading */
+#loading {
+  position: fixed; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  z-index: 100;
+  background: #000;
+  color: #fff;
+  transition: opacity 0.8s;
+}
+#loading.hidden { opacity: 0; pointer-events: none; }
+#loading .spinner {
+  width: 40px; height: 40px;
+  border: 2px solid rgba(255,255,255,0.1);
+  border-top-color: #ff6b6b;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+#loading p {
+  font-size: 14px; opacity: 0.6;
+  letter-spacing: 2px;
+}
+@media (max-width: 640px) {
+  #camera-container { width: 120px; height: 90px; bottom: 16px; right: 16px; }
+  #gesture-ui { top: 16px; left: 16px; }
+  #gesture-name { font-size: 20px; }
+  #gesture-emoji { font-size: 28px; }
+}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <p>🌌 Happy Birthday Rosy · 粒子宇宙加载中...</p>
+</div>
+
+<div id="three-container"></div>
+
+<div id="gesture-ui">
+  <div id="gesture-emoji">🌌</div>
+  <div id="gesture-name">Happy Birthday</div>
+  <div id="gesture-desc">将手对准摄像头以交互 · 剪刀手切换形态</div>
+</div>
+
+<div id="camera-container">
+  <video id="webcam" playsinline></video>
+  <canvas id="hand-canvas"></canvas>
+  <span class="camera-label">📷 手势</span>
+</div>
+
+<div id="fps"></div>
+<button id="fullscreen-btn" onclick="toggleFullscreen()">⛶ 全屏</button>
+<button id="music-btn" onclick="tryStartAudio()">♪ 点击播放音乐</button>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ============================================================
+// CONFIGURATION
+// ============================================================
+const CONFIG = {
+  particleCount: 4000,
+  starCount: 2500,
+  spiralArms: 3,
+  spiralRadius: 5.5,
+  spiralThickness: 0.8,
+  connectionThreshold: 0.55,
+  maxConnectionsPerParticle: 3,
+  springStrength: 0.04,
+  damping: 0.92,
+  rotationSpeed: 0.04,
+  spinBoost: 0.25,
+  repulsionStrength: 0.08,
+  attractionStrength: 0.06,
+  pinchStrength: 0.12,
+  pushStrength: 0.1,
+  morphologies: ['spiral', 'sphere', 'cube', 'cake']
+};
+
+// ============================================================
+// THREE.JS SETUP
+// ============================================================
+const container = document.getElementById('three-container');
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(0, 2, 8);
+
+const renderer = new THREE.WebGLRenderer({
+  antialias: true,
+  alpha: true
+});
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setClearColor(0x000000, 1);
+container.appendChild(renderer.domElement);
+
+// ============================================================
+// TEXTURES
+// ============================================================
+function createGlowTexture() {
+  const size = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const center = size / 2;
+  const gradient = ctx.createRadialGradient(center, center, 0, center, center, center);
+  gradient.addColorStop(0, 'rgba(255,255,255,1)');
+  gradient.addColorStop(0.1, 'rgba(255,255,255,0.9)');
+  gradient.addColorStop(0.3, 'rgba(255,255,255,0.5)');
+  gradient.addColorStop(0.6, 'rgba(255,255,255,0.15)');
+  gradient.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+  return new THREE.CanvasTexture(canvas);
+}
+const glowTexture = createGlowTexture();
+
+function createStarTexture() {
+  const size = 16;
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const c = size / 2;
+  const grad = ctx.createRadialGradient(c, c, 0, c, c, c);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.5, 'rgba(255,255,255,0.3)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+  return new THREE.CanvasTexture(canvas);
+}
+const starTexture = createStarTexture();
+
+// ============================================================
+// PARTICLE SYSTEM
+// ============================================================
+const N = CONFIG.particleCount;
+const pos = new Float32Array(N * 3);
+const vel = new Float32Array(N * 3);
+const target = new Float32Array(N * 3);
+const baseSizes = new Float32Array(N);
+const particleHues = new Float32Array(N);
+
+let currentMorph = 'spiral';
+let morphTarget = 0;
+// Track which particles are candle tips in cake mode
+let candleIndices = [];
+
+function generateSpiral(out) {
+  for (let i = 0; i < N; i++) {
+    const t = Math.pow(i / N, 0.7);
+    const radius = 0.4 + t * CONFIG.spiralRadius;
+    const angle = t * CONFIG.spiralArms * 2 * Math.PI + (i % CONFIG.spiralArms) * (2 * Math.PI / CONFIG.spiralArms);
+    const spread = 0.15 * (1 + t * 2);
+    out[i * 3] = radius * Math.cos(angle) + (Math.random() - 0.5) * spread;
+    out[i * 3 + 1] = (Math.random() - 0.5) * CONFIG.spiralThickness * (1 - t * 0.3);
+    out[i * 3 + 2] = radius * Math.sin(angle) + (Math.random() - 0.5) * spread;
+  }
+}
+
+function generateSphere(out) {
+  const r = CONFIG.spiralRadius * 0.7;
+  for (let i = 0; i < N; i++) {
+    const phi = Math.acos(1 - 2 * (i + 0.5) / N);
+    const theta = Math.PI * (1 + Math.sqrt(5)) * i;
+    const jitter = 0.6 + Math.random() * 0.4;
+    const rr = r * jitter;
+    out[i * 3] = rr * Math.sin(phi) * Math.cos(theta);
+    out[i * 3 + 1] = rr * Math.sin(phi) * Math.sin(theta);
+    out[i * 3 + 2] = rr * Math.cos(phi);
+  }
+}
+
+function generateCube(out) {
+  const half = CONFIG.spiralRadius * 0.6;
+  for (let i = 0; i < N; i++) {
+    out[i * 3] = (Math.random() - 0.5) * half * 2;
+    out[i * 3 + 1] = (Math.random() - 0.5) * half * 2;
+    out[i * 3 + 2] = (Math.random() - 0.5) * half * 2;
+  }
+}
+
+function generateCake(out) {
+  const cakeR = CONFIG.spiralRadius * 0.45;
+  const cakeH = CONFIG.spiralRadius * 0.5;
+  let idx = 0;
+  candleIndices = [];
+
+  // Bottom tier (~55%)
+  const bottomN = Math.floor(N * 0.55);
+  for (let i = 0; i < bottomN; i++) {
+    const angle = Math.random() * 2 * Math.PI;
+    const r = cakeR * Math.sqrt(Math.random()) * 0.92;
+    const h = (Math.random() - 0.5) * cakeH * 0.7;
+    out[idx * 3] = r * Math.cos(angle);
+    out[idx * 3 + 1] = h - 0.1;
+    out[idx * 3 + 2] = r * Math.sin(angle);
+    idx++;
+  }
+
+  // Top tier (~30%)
+  const topN = Math.floor(N * 0.30);
+  const topR = cakeR * 0.65;
+  for (let i = 0; i < topN; i++) {
+    const angle = Math.random() * 2 * Math.PI;
+    const r = topR * Math.sqrt(Math.random()) * 0.92;
+    const h = (Math.random() - 0.5) * cakeH * 0.5;
+    out[idx * 3] = r * Math.cos(angle);
+    out[idx * 3 + 1] = h + 0.2;
+    out[idx * 3 + 2] = r * Math.sin(angle);
+    idx++;
+  }
+
+  // Candles (~15%): visible candle sticks with flame tips
+  const numCandles = 7;
+  const perCandle = Math.floor((N - idx) / numCandles);
+  for (let ci = 0; ci < numCandles && idx < N; ci++) {
+    const angle = (ci / numCandles) * 2 * Math.PI + 0.3;
+    const cr = topR * 0.4;
+    for (let pi = 0; pi < perCandle && idx < N; pi++) {
+      const t = pi / perCandle; // 0 = bottom of candle, 1 = flame tip
+      const h = 0.35 + t * 0.35;
+      const jitter = (Math.random() - 0.5) * (0.04 + t * 0.06);
+      out[idx * 3] = cr * Math.cos(angle) + jitter;
+      out[idx * 3 + 1] = 0.45 + h;
+      out[idx * 3 + 2] = cr * Math.sin(angle) + jitter;
+      // Mark top ~40% of each candle as "flame" particles
+      if (t > 0.6) candleIndices.push(idx);
+      idx++;
+    }
+  }
+  // Fill remaining
+  while (idx < N) {
+    const angle = Math.random() * 2 * Math.PI;
+    const cr = topR * 0.3;
+    out[idx * 3] = cr * Math.cos(angle) + (Math.random() - 0.5) * 0.05;
+    out[idx * 3 + 1] = 0.7 + Math.random() * 0.2;
+    out[idx * 3 + 2] = cr * Math.sin(angle) + (Math.random() - 0.5) * 0.05;
+    candleIndices.push(idx);
+    idx++;
+  }
+}
+
+const morphGenerators = {
+  spiral: generateSpiral,
+  sphere: generateSphere,
+  cube: generateCube,
+  cake: generateCake
+};
+
+function initParticles() {
+  generateSpiral(target);
+  for (let i = 0; i < N; i++) {
+    pos[i * 3] = target[i * 3];
+    pos[i * 3 + 1] = target[i * 3 + 1];
+    pos[i * 3 + 2] = target[i * 3 + 2];
+    vel[i * 3] = 0;
+    vel[i * 3 + 1] = 0;
+    vel[i * 3 + 2] = 0;
+    baseSizes[i] = 0.08 + Math.random() * 0.12;
+    particleHues[i] = (i / N) * 0.6 + Math.random() * 0.1;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('size', new THREE.BufferAttribute(baseSizes, 1));
+
+  const mat = new THREE.PointsMaterial({
+    size: 0.15,
+    map: glowTexture,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    transparent: true,
+    opacity: 0.9,
+    color: 0xff8844,
+    sizeAttenuation: true
+  });
+
+  const points = new THREE.Points(geo, mat);
+  scene.add(points);
+  return { points, geo, mat };
+}
+
+const particleSystem = initParticles();
+
+// ============================================================
+// CONNECTION NETWORK
+// ============================================================
+let connections = [];
+let lineSegments = null;
+let lineGeometry = null;
+const lineMaterial = new THREE.LineBasicMaterial({
+  color: 0xff6644,
+  transparent: true,
+  opacity: 0.12,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false
+});
+
+function computeConnections(src) {
+  const pairs = [];
+  const thresholdSq = CONFIG.connectionThreshold * CONFIG.connectionThreshold;
+  const maxPer = CONFIG.maxConnectionsPerParticle;
+  const used = new Uint8Array(N);
+
+  for (let i = 0; i < N; i++) {
+    if (used[i] >= maxPer) continue;
+    const ix = src[i * 3], iy = src[i * 3 + 1], iz = src[i * 3 + 2];
+    const candidates = [];
+
+    for (let j = 0; j < N; j++) {
+      if (i === j || used[j] >= maxPer) continue;
+      const dx = ix - src[j * 3];
+      const dy = iy - src[j * 3 + 1];
+      const dz = iz - src[j * 3 + 2];
+      const dSq = dx * dx + dy * dy + dz * dz;
+      if (dSq < thresholdSq) {
+        candidates.push({ idx: j, d: dSq });
+      }
+    }
+
+    candidates.sort((a, b) => a.d - b.d);
+    const take = Math.min(maxPer - used[i], candidates.length);
+    for (let k = 0; k < take; k++) {
+      const j = candidates[k].idx;
+      pairs.push(i, j);
+      used[i]++;
+      used[j]++;
+    }
+  }
+
+  return pairs;
+}
+
+function rebuildLines(src) {
+  connections = computeConnections(src);
+  const numLines = connections.length / 2;
+  const linePos = new Float32Array(numLines * 6);
+
+  for (let k = 0; k < numLines; k++) {
+    const i = connections[k * 2];
+    const j = connections[k * 2 + 1];
+    linePos[k * 6] = src[i * 3];
+    linePos[k * 6 + 1] = src[i * 3 + 1];
+    linePos[k * 6 + 2] = src[i * 3 + 2];
+    linePos[k * 6 + 3] = src[j * 3];
+    linePos[k * 6 + 4] = src[j * 3 + 1];
+    linePos[k * 6 + 5] = src[j * 3 + 2];
+  }
+
+  if (lineSegments) {
+    scene.remove(lineSegments);
+    lineGeometry.dispose();
+  }
+
+  lineGeometry = new THREE.BufferGeometry();
+  lineGeometry.setAttribute('position', new THREE.BufferAttribute(linePos, 3));
+  lineSegments = new THREE.LineSegments(lineGeometry, lineMaterial);
+  scene.add(lineSegments);
+}
+
+// ============================================================
+// BACKGROUND STARS
+// ============================================================
+function createStars() {
+  const n = CONFIG.starCount;
+  // Layer 1: distant tiny stars (80%)
+  const tinyN = Math.floor(n * 0.8);
+  // Layer 2: bright twinkling stars (20%)
+  const brightN = n - tinyN;
+
+  const starPos = new Float32Array(n * 3);
+  const starSizes = new Float32Array(n);
+  const starPhases = new Float32Array(n);
+  const starSpeeds = new Float32Array(n);
+  const starColors = new Float32Array(n * 3);
+
+  let idx = 0;
+  // Tiny stars: far away, small, white
+  for (let i = 0; i < tinyN; i++) {
+    const r = 15 + Math.random() * 25;
+    const theta = Math.random() * 2 * Math.PI;
+    const phi = Math.acos(2 * Math.random() - 1);
+    starPos[idx * 3] = r * Math.sin(phi) * Math.cos(theta);
+    starPos[idx * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+    starPos[idx * 3 + 2] = r * Math.cos(phi);
+    starSizes[idx] = 0.04 + Math.random() * 0.06;
+    starPhases[idx] = Math.random() * 2 * Math.PI;
+    starSpeeds[idx] = 0.5 + Math.random() * 1.5;
+    const tint = Math.random();
+    if (tint < 0.3) { // warm tint
+      starColors[idx*3] = 1; starColors[idx*3+1] = 0.9; starColors[idx*3+2] = 0.7;
+    } else if (tint < 0.5) { // cool tint
+      starColors[idx*3] = 0.7; starColors[idx*3+1] = 0.8; starColors[idx*3+2] = 1;
+    } else {
+      starColors[idx*3] = 1; starColors[idx*3+1] = 1; starColors[idx*3+2] = 1;
+    }
+    idx++;
+  }
+
+  // Bright stars: closer, larger, twinkle visibly
+  for (let i = 0; i < brightN; i++) {
+    const r = 8 + Math.random() * 12;
+    const theta = Math.random() * 2 * Math.PI;
+    const phi = Math.acos(2 * Math.random() - 1);
+    starPos[idx * 3] = r * Math.sin(phi) * Math.cos(theta);
+    starPos[idx * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+    starPos[idx * 3 + 2] = r * Math.cos(phi);
+    starSizes[idx] = 0.12 + Math.random() * 0.2;
+    starPhases[idx] = Math.random() * 2 * Math.PI;
+    starSpeeds[idx] = 0.3 + Math.random() * 0.8;
+    // Bright stars have vivid colors
+    const hue = Math.random() * 0.15 + (Math.random() < 0.5 ? 0 : 0.55);
+    const c = new THREE.Color().setHSL(hue, 0.8, 0.7);
+    starColors[idx*3] = c.r; starColors[idx*3+1] = c.g; starColors[idx*3+2] = c.b;
+    idx++;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+
+  const mat = new THREE.PointsMaterial({
+    size: 0.08,
+    map: starTexture,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    transparent: true,
+    opacity: 0.6,
+    vertexColors: true,
+    sizeAttenuation: true
+  });
+
+  const stars = new THREE.Points(geo, mat);
+  scene.add(stars);
+
+  // Expose data for twinkling animation
+  stars.userData = { starSizes, starPhases, starSpeeds };
+  return stars;
+}
+const starField = createStars();
+
+// Bright twinkling star sprites
+const brightStarSprites = [];
+function initBrightStars() {
+  const colors = [0xffdd88, 0xffaacc, 0xaaccff, 0xffccaa, 0xddffaa];
+  for (let i = 0; i < 15; i++) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64; canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, 'rgba(255,255,255,0.9)');
+    g.addColorStop(0.15, 'rgba(255,255,255,0.4)');
+    g.addColorStop(0.5, 'rgba(255,255,255,0.05)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 64, 64);
+    // Add star cross
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(32, 8); ctx.lineTo(32, 56); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(8, 32); ctx.lineTo(56, 32); ctx.stroke();
+
+    const tex = new THREE.CanvasTexture(canvas);
+    const mat = new THREE.SpriteMaterial({
+      map: tex, blending: THREE.AdditiveBlending, depthWrite: false,
+      transparent: true, opacity: 0.8, color: colors[i % colors.length]
+    });
+    const sprite = new THREE.Sprite(mat);
+    const r = 12 + Math.random() * 15;
+    const theta = Math.random() * 2 * Math.PI;
+    const phi = Math.acos(2 * Math.random() - 1);
+    sprite.position.set(
+      r * Math.sin(phi) * Math.cos(theta),
+      r * Math.sin(phi) * Math.sin(theta),
+      r * Math.cos(phi)
+    );
+    const s = 0.15 + Math.random() * 0.25;
+    sprite.scale.set(s, s, 1);
+    sprite.userData = {
+      baseScale: s, phase: Math.random() * 2 * Math.PI, speed: 0.4 + Math.random() * 0.6
+    };
+    scene.add(sprite);
+    brightStarSprites.push(sprite);
+  }
+}
+initBrightStars();
+
+// ============================================================
+// BIRTHDAY ELEMENTS
+// ============================================================
+
+// --- Particle-based "Happy Birthday Rosy" text ---
+function createTextParticles() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 2048;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 140px "Arial","Helvetica","Segoe UI",sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Happy Birthday Rosy', 1024, 110);
+
+  const data = ctx.getImageData(0, 0, 2048, 256).data;
+  const samplePositions = [];
+  const step = 3;
+
+  // Measure actual text width for proper scaling
+  const textMetrics = ctx.measureText('Happy Birthday Rosy');
+  const textWidth = textMetrics.width;
+  // Scale so text spans ~7 units in 3D space
+  const scale = 7.0 / textWidth;
+
+  for (let y = 0; y < 256; y += step) {
+    for (let x = 0; x < 2048; x += step) {
+      const i = (y * 2048 + x) * 4;
+      if (data[i] > 128) {
+        samplePositions.push(
+          (x - 1024) * scale,
+          (110 - y) * scale,
+          (Math.random() - 0.5) * 0.08
+        );
+      }
+    }
+  }
+
+  // Fallback: if text didn't render (too few particles), generate a heart + star shape
+  if (samplePositions.length < 150) {
+    samplePositions.length = 0;
+    // Heart shape parametric equation, plus "HAPPY" hint text
+    for (let i = 0; i < 600; i++) {
+      const t = Math.random() * 2 * Math.PI;
+      const r = 0.8 + Math.random() * 1.2;
+      // Heart: x = 16 sin³t, y = 13cos(t) - 5 cos(2t) - 2cos(3t) - cos(4t)
+      const hx = r * 16 * Math.pow(Math.sin(t), 3);
+      const hy = r * (13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t));
+      samplePositions.push(
+        hx * 0.06 + (Math.random() - 0.5) * 0.12,
+        hy * 0.06 + 0.5 + (Math.random() - 0.5) * 0.12,
+        (Math.random() - 0.5) * 0.15
+      );
+    }
+    // Add scattered sparkles around the heart
+    for (let i = 0; i < 200; i++) {
+      const a = Math.random() * 2 * Math.PI;
+      const rad = 0.5 + Math.random() * 1.5;
+      samplePositions.push(
+        Math.cos(a) * rad,
+        0.5 + Math.sin(a) * rad * 0.7,
+        (Math.random() - 0.5) * 0.2
+      );
+    }
+  }
+
+  const tn = Math.floor(samplePositions.length / 3);
+  const targetPos = new Float32Array(samplePositions);
+  const scatterPos = new Float32Array(tn * 3);
+  const currentPos = new Float32Array(tn * 3);
+  const textVel = new Float32Array(tn * 3);
+  const textColors = new Float32Array(tn * 3);
+  const textSizes = new Float32Array(tn);
+
+  for (let i = 0; i < tn; i++) {
+    // Spherical scatter around the scene
+    const a1 = Math.random() * 2 * Math.PI;
+    const a2 = Math.random() * 2 * Math.PI;
+    const r = 2 + Math.random() * 5;
+    scatterPos[i * 3] = Math.cos(a1) * Math.sin(a2) * r;
+    scatterPos[i * 3 + 1] = Math.sin(a1) * r * 0.5;
+    scatterPos[i * 3 + 2] = Math.cos(a2) * r;
+
+    currentPos[i * 3] = scatterPos[i * 3];
+    currentPos[i * 3 + 1] = scatterPos[i * 3 + 1];
+    currentPos[i * 3 + 2] = scatterPos[i * 3 + 2];
+
+    textVel[i * 3] = 0;
+    textVel[i * 3 + 1] = 0;
+    textVel[i * 3 + 2] = 0;
+
+    // Warm birthday colors
+    const h = 0.03 + Math.random() * 0.12;
+    const c = new THREE.Color().setHSL(h, 0.9, 0.55 + Math.random() * 0.25);
+    textColors[i * 3] = c.r;
+    textColors[i * 3 + 1] = c.g;
+    textColors[i * 3 + 2] = c.b;
+    textSizes[i] = 0.08 + Math.random() * 0.1;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(currentPos, 3));
+
+  const mat = new THREE.PointsMaterial({
+    size: 0.12,
+    map: glowTexture,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    transparent: true,
+    opacity: 0,
+    vertexColors: false,
+    color: 0xffcc44,
+    sizeAttenuation: true
+  });
+
+  const points = new THREE.Points(geo, mat);
+  scene.add(points);
+
+  return {
+    points, geo, mat,
+    targetPos, scatterPos, currentPos, textVel,
+    colors: textColors, sizes: textSizes,
+    count: tn,
+    assemblyProgress: 0,
+    targetAssembly: 0
+  };
+}
+const textP = createTextParticles();
+
+// --- Candle glow sprite (warm light at origin) ---
+function createCandleGlow() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128; canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grad.addColorStop(0, 'rgba(255,200,100,1)');
+  grad.addColorStop(0.1, 'rgba(255,180,80,0.8)');
+  grad.addColorStop(0.3, 'rgba(255,150,50,0.3)');
+  grad.addColorStop(0.6, 'rgba(255,100,20,0.08)');
+  grad.addColorStop(1, 'rgba(255,50,0,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 128, 128);
+  const texture = new THREE.CanvasTexture(canvas);
+
+  const mat = new THREE.SpriteMaterial({
+    map: texture,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    transparent: true,
+    opacity: 0.5
+  });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(8, 8, 1);
+  sprite.position.set(0, 0, 0);
+  return sprite;
+}
+const candleGlow = createCandleGlow();
+scene.add(candleGlow);
+
+// --- Confetti system ---
+const CONFETTI_COUNT = 300;
+const confettiPos = new Float32Array(CONFETTI_COUNT * 3);
+const confettiVel = [];
+const confettiCol = new Float32Array(CONFETTI_COUNT * 3);
+const confettiSize = new Float32Array(CONFETTI_COUNT);
+
+function resetConfettiParticle(i, randomY) {
+  confettiPos[i * 3] = (Math.random() - 0.5) * 16;
+  confettiPos[i * 3 + 1] = randomY ? Math.random() * 12 : 10 + Math.random() * 4;
+  confettiPos[i * 3 + 2] = (Math.random() - 0.5) * 16;
+  confettiVel[i] = {
+    x: (Math.random() - 0.5) * 0.018,
+    y: -(0.006 + Math.random() * 0.012),
+    z: (Math.random() - 0.5) * 0.018
+  };
+}
+
+for (let i = 0; i < CONFETTI_COUNT; i++) {
+  resetConfettiParticle(i, true);
+  const c = new THREE.Color().setHSL(Math.random() * 0.15 + 0.95, 0.9, 0.6);
+  confettiCol[i * 3] = c.r;
+  confettiCol[i * 3 + 1] = c.g;
+  confettiCol[i * 3 + 2] = c.b;
+  confettiSize[i] = 0.04 + Math.random() * 0.08;
+}
+
+const confettiGeo = new THREE.BufferGeometry();
+confettiGeo.setAttribute('position', new THREE.BufferAttribute(confettiPos, 3));
+confettiGeo.setAttribute('color', new THREE.BufferAttribute(confettiCol, 3));
+
+const confettiMat = new THREE.PointsMaterial({
+  size: 0.1,
+  map: glowTexture,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  transparent: true,
+  opacity: 0.6,
+  vertexColors: true,
+  sizeAttenuation: true
+});
+
+const confettiPoints = new THREE.Points(confettiGeo, confettiMat);
+scene.add(confettiPoints);
+
+// --- Sparkle burst system ---
+const SPARKLE_COUNT = 60;
+const sparklePos = new Float32Array(SPARKLE_COUNT * 3);
+const sparkleVel = [];
+const sparkleLife = new Float32Array(SPARKLE_COUNT);
+let sparkleTimer = 0;
+
+for (let i = 0; i < SPARKLE_COUNT; i++) {
+  sparkleLife[i] = 0;
+  sparkleVel.push({ x: 0, y: 0, z: 0 });
+}
+
+function triggerSparkleBurst() {
+  const cx = (Math.random() - 0.5) * 3;
+  const cy = Math.random() * 2.5;
+  const cz = (Math.random() - 0.5) * 3;
+  for (let i = 0; i < SPARKLE_COUNT; i++) {
+    const theta = Math.random() * 2 * Math.PI;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const speed = 0.04 + Math.random() * 0.1;
+    sparklePos[i * 3] = cx;
+    sparklePos[i * 3 + 1] = cy;
+    sparklePos[i * 3 + 2] = cz;
+    sparkleVel[i] = {
+      x: Math.sin(phi) * Math.cos(theta) * speed,
+      y: Math.sin(phi) * Math.sin(theta) * speed * 0.6,
+      z: Math.cos(phi) * speed
+    };
+    sparkleLife[i] = 1.5 + Math.random() * 1.5;
+  }
+}
+
+const sparkleGeo = new THREE.BufferGeometry();
+sparkleGeo.setAttribute('position', new THREE.BufferAttribute(sparklePos, 3));
+
+const sparkleMat = new THREE.PointsMaterial({
+  size: 0.15,
+  map: glowTexture,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  transparent: true,
+  opacity: 0,
+  color: 0xffdd66,
+  sizeAttenuation: true
+});
+
+const sparklePoints = new THREE.Points(sparkleGeo, sparkleMat);
+scene.add(sparklePoints);
+
+triggerSparkleBurst();
+
+// ============================================================
+// INIT CONNECTIONS
+// ============================================================
+rebuildLines(target);
+
+// ============================================================
+// GESTURE DETECTION
+// ============================================================
+const FINGER_TIPS = [4, 8, 12, 16, 20];
+const FINGER_PIPS = [3, 6, 10, 14, 18];
+const FINGER_MCPS = [2, 5, 9, 13, 17]; // MCP joint per finger (more accurate reference)
+const HAND_CONNECTIONS = [
+  [0,1],[1,2],[2,3],[3,4],
+  [0,5],[5,6],[6,7],[7,8],
+  [0,9],[9,10],[10,11],[11,12],
+  [0,13],[13,14],[14,15],[15,16],
+  [0,17],[17,18],[18,19],[19,20],
+  [5,9],[9,13],[13,17]
+];
+
+let handLandmarks = null;
+let currentGesture = 'none';
+let previousGesture = 'none';
+let gestureCooldown = 0;
+let morphCycle = 0;
+
+function detectFingers(lm) {
+  const extended = [];
+  // Thumb: measure distance from thumb tip to index MCP joint
+  // When thumb is extended, its tip is farther from index MCP than its IP joint
+  const idxMcp = lm[5];
+  const thumbTip = lm[4];
+  const thumbIp = lm[3];
+  const ttDist = Math.hypot(thumbTip.x - idxMcp.x, thumbTip.y - idxMcp.y);
+  const tiDist = Math.hypot(thumbIp.x - idxMcp.x, thumbIp.y - idxMcp.y);
+  extended.push(ttDist > tiDist + 0.015);
+
+  // Fingers 1-4 (index to pinky): use joint angle for most reliable detection
+  // Compare the direction of MCP→PIP vs PIP→Tip via dot product
+  // When finger is straight, these vectors point in similar directions (dot > 0.5)
+  // When curled, they point in different directions (dot << 0.5)
+  for (let i = 1; i < 5; i++) {
+    const tip = lm[FINGER_TIPS[i]];
+    const pip = lm[FINGER_PIPS[i]];
+    const mcp = lm[FINGER_MCPS[i]];
+    // Vector from MCP to PIP (forward along finger)
+    const v1x = pip.x - mcp.x, v1y = pip.y - mcp.y;
+    // Vector from PIP to Tip (forward along finger)
+    const v2x = tip.x - pip.x, v2y = tip.y - pip.y;
+    const len1 = Math.hypot(v1x, v1y);
+    const len2 = Math.hypot(v2x, v2y);
+    if (len1 < 0.001 || len2 < 0.001) { extended.push(false); continue; }
+    const dot = (v1x * v2x + v1y * v2y) / (len1 * len2);
+    // dot > 0.4 means angle < ~66°, finger is reasonably straight
+    extended.push(dot > 0.4);
+  }
+  return extended;
+}
+
+function recognizeGesture(lm) {
+  if (!lm) return 'none';
+  const f = detectFingers(lm);
+  const count = f.filter(Boolean).length;
+
+  const thumbIdx = lm[4];
+  const indexTip = lm[8];
+  const pinchDist = Math.hypot(thumbIdx.x - indexTip.x, thumbIdx.y - indexTip.y, (thumbIdx.z || 0) - (indexTip.z || 0));
+
+  if (pinchDist < 0.08) return 'pinch';
+  if (count >= 4) return 'open_palm';
+  if (count <= 1) return 'fist';
+  if (f[1] && !f[2] && !f[3] && !f[4]) return 'point';
+  if (f[1] && f[2] && !f[3] && !f[4]) return 'peace';
+
+  return 'none';
+}
+
+function getHandPosition(lm, idx) {
+  if (!lm) return { x: 0, y: 0, z: 0 };
+  const scale = 12;
+  return {
+    x: (lm[idx].x - 0.5) * scale,
+    y: (0.5 - lm[idx].y) * scale,
+    z: (lm[idx].z || 0) * scale * 0.5
+  };
+}
+
+// ============================================================
+// GESTURE INFO
+// ============================================================
+const GESTURE_INFO = {
+  'none':       { emoji: '🌌', name: 'Happy Birthday Rosy', desc: '张开手掌 · 握拳 · 捏合 · 食指指向 · 剪刀手' },
+  'open_palm':  { emoji: '✋', name: '排斥力场', desc: '掌心产生斥力，粒子向外扩散爆炸' },
+  'fist':       { emoji: '✊', name: '引力吸引', desc: '粒子向掌心聚集，加速自旋 · 点燃蜡烛🔥' },
+  'pinch':      { emoji: '🤏', name: '引力奇点', desc: '所有粒子被吸引到指尖' },
+  'point':      { emoji: '☝️', name: '推力波束', desc: '食指方向粒子被排斥弹开' },
+  'peace':      { emoji: '✌️', name: '形态切换 + ✨Rosy', desc: '切换形态 · 蛋糕形态时显示 Happy Birthday Rosy 粒子文字' }
+};
+
+function updateGestureUI(gesture) {
+  const info = GESTURE_INFO[gesture] || GESTURE_INFO.none;
+  document.getElementById('gesture-emoji').textContent = info.emoji;
+  document.getElementById('gesture-name').textContent = info.name;
+  document.getElementById('gesture-desc').textContent = info.desc;
+}
+
+// ============================================================
+// HAND DRAWING
+// ============================================================
+function drawHand(ctx, lm, w, h) {
+  ctx.clearRect(0, 0, w, h);
+  if (!lm) return;
+
+  ctx.strokeStyle = 'rgba(0, 200, 255, 0.4)';
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = 'round';
+  for (const [i, j] of HAND_CONNECTIONS) {
+    ctx.beginPath();
+    ctx.moveTo(lm[i].x * w, lm[i].y * h);
+    ctx.lineTo(lm[j].x * w, lm[j].y * h);
+    ctx.stroke();
+  }
+
+  for (let i = 0; i < lm.length; i++) {
+    const x = lm[i].x * w, y = lm[i].y * h;
+    const r = i < 5 ? 3 : 2;
+    ctx.fillStyle = i === 4 || i === 8 ? 'rgba(255, 200, 50, 0.9)' : 'rgba(100, 200, 255, 0.7)';
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, 2 * Math.PI);
+    ctx.fill();
+  }
+}
+
+// ============================================================
+// MEDIAPIPE SETUP
+// ============================================================
+const video = document.getElementById('webcam');
+const handCanvas = document.getElementById('hand-canvas');
+const handCtx = handCanvas.getContext('2d');
+
+async function setupMediaPipe() {
+  try {
+    await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js');
+    await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js');
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: 640, height: 480, facingMode: 'user' }
+    });
+    video.srcObject = stream;
+    await video.play();
+
+    // Sync canvas size with actual video dimensions
+    function syncCanvasSize() {
+      const w = video.videoWidth || 640;
+      const h = video.videoHeight || 480;
+      handCanvas.width = w;
+      handCanvas.height = h;
+    }
+    syncCanvasSize();
+    video.addEventListener('resize', syncCanvasSize);
+
+    const hands = new Hands({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}`
+    });
+
+    hands.setOptions({
+      maxNumHands: 1,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+
+    hands.onResults((results) => {
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        handLandmarks = results.multiHandLandmarks[0];
+      } else {
+        handLandmarks = null;
+      }
+      drawHand(handCtx, handLandmarks, handCanvas.width, handCanvas.height);
+    });
+
+    const camera = new Camera(video, {
+      onFrame: async () => {
+        try { await hands.send({ image: video }); } catch(e) {}
+      },
+      width: 320,
+      height: 240
+    });
+    camera.start();
+
+    document.getElementById('loading').classList.add('hidden');
+  } catch (err) {
+    console.warn('MediaPipe/Camera init failed:', err);
+    document.getElementById('loading').classList.add('hidden');
+  }
+}
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+setupMediaPipe();
+
+setTimeout(() => {
+  document.getElementById('loading').classList.add('hidden');
+}, 8000);
+
+// ============================================================
+// INTERACTION / FORCES
+// ============================================================
+function applyForces() {
+  if (!handLandmarks || currentGesture === 'none') return;
+
+  const palm = getHandPosition(handLandmarks, 9);
+
+  switch (currentGesture) {
+    case 'open_palm': {
+      const cx = palm.x, cy = palm.y, cz = palm.z;
+      for (let i = 0; i < N; i++) {
+        const dx = pos[i * 3] - cx;
+        const dy = pos[i * 3 + 1] - cy;
+        const dz = pos[i * 3 + 2] - cz;
+        const distSq = dx * dx + dy * dy + dz * dz + 0.01;
+        const force = CONFIG.repulsionStrength / distSq;
+        vel[i * 3] += dx * force;
+        vel[i * 3 + 1] += dy * force;
+        vel[i * 3 + 2] += dz * force;
+      }
+      break;
+    }
+
+    case 'fist': {
+      const cx = palm.x, cy = palm.y, cz = palm.z;
+      for (let i = 0; i < N; i++) {
+        const dx = cx - pos[i * 3];
+        const dy = cy - pos[i * 3 + 1];
+        const dz = cz - pos[i * 3 + 2];
+        const distSq = dx * dx + dy * dy + dz * dz + 0.01;
+        const force = CONFIG.attractionStrength / (distSq + 0.5);
+        vel[i * 3] += dx * force;
+        vel[i * 3 + 1] += dy * force;
+        vel[i * 3 + 2] += dz * force;
+        const tx = -pos[i * 3 + 2] * CONFIG.spinBoost * 0.02;
+        const tz = pos[i * 3] * CONFIG.spinBoost * 0.02;
+        vel[i * 3] += tx;
+        vel[i * 3 + 2] += tz;
+      }
+      break;
+    }
+
+    case 'pinch': {
+      const t = getHandPosition(handLandmarks, 4);
+      const i = getHandPosition(handLandmarks, 8);
+      const px = (t.x + i.x) / 2;
+      const py = (t.y + i.y) / 2;
+      const pz = (t.z + i.z) / 2;
+      for (let i = 0; i < N; i++) {
+        const dx = px - pos[i * 3];
+        const dy = py - pos[i * 3 + 1];
+        const dz = pz - pos[i * 3 + 2];
+        const distSq = dx * dx + dy * dy + dz * dz + 0.01;
+        const force = CONFIG.pinchStrength / (distSq + 0.1);
+        vel[i * 3] += dx * force;
+        vel[i * 3 + 1] += dy * force;
+        vel[i * 3 + 2] += dz * force;
+      }
+      break;
+    }
+
+    case 'point': {
+      const wrist = getHandPosition(handLandmarks, 0);
+      const idxTip = getHandPosition(handLandmarks, 8);
+      const dirX = idxTip.x - wrist.x;
+      const dirY = idxTip.y - wrist.y;
+      const dirZ = idxTip.z - wrist.z;
+      const len = Math.hypot(dirX, dirY, dirZ) + 0.001;
+      const nx = dirX / len, ny = dirY / len, nz = dirZ / len;
+      const tipX = idxTip.x, tipY = idxTip.y, tipZ = idxTip.z;
+
+      for (let i = 0; i < N; i++) {
+        const dx = pos[i * 3] - tipX;
+        const dy = pos[i * 3 + 1] - tipY;
+        const dz = pos[i * 3 + 2] - tipZ;
+        const dot = dx * nx + dy * ny + dz * nz;
+        if (dot <= 0) continue;
+        const perpSq = dx * dx + dy * dy + dz * dz - dot * dot;
+        if (perpSq > 1.5) continue;
+        const force = CONFIG.pushStrength / (dot * 0.5 + 0.1);
+        vel[i * 3] += nx * force;
+        vel[i * 3 + 1] += ny * force;
+        vel[i * 3 + 2] += nz * force;
+      }
+      break;
+    }
+  }
+}
+
+// ============================================================
+// MORPHOLOGY SWITCH
+// ============================================================
+function switchMorphology() {
+  morphCycle = (morphCycle + 1) % CONFIG.morphologies.length;
+  currentMorph = CONFIG.morphologies[morphCycle];
+  morphGenerators[currentMorph](target);
+  rebuildLines(target);
+}
+
+// ============================================================
+// ANIMATION
+// ============================================================
+let time = 0;
+const fpsEl = document.getElementById('fps');
+let frameCount = 0;
+let fpsTime = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const dt = 1 / 60;
+  time += dt;
+  frameCount++;
+
+  // FPS
+  if (time - fpsTime > 1) {
+    fpsEl.textContent = `${frameCount} FPS`;
+    frameCount = 0;
+    fpsTime = time;
+  }
+
+  // === Gesture recognition ===
+  previousGesture = currentGesture;
+
+  if (handLandmarks) {
+    const detected = recognizeGesture(handLandmarks);
+    if (gestureCooldown <= 0 && detected === 'peace' && previousGesture !== 'peace') {
+      switchMorphology();
+      gestureCooldown = 30;
+    }
+    currentGesture = detected;
+  } else {
+    currentGesture = 'none';
+  }
+  if (gestureCooldown > 0) gestureCooldown--;
+
+  if (currentGesture !== previousGesture) {
+    updateGestureUI(currentGesture);
+  }
+
+  // === Main particle physics ===
+  for (let i = 0; i < N; i++) {
+    vel[i * 3] += (target[i * 3] - pos[i * 3]) * CONFIG.springStrength;
+    vel[i * 3 + 1] += (target[i * 3 + 1] - pos[i * 3 + 1]) * CONFIG.springStrength;
+    vel[i * 3 + 2] += (target[i * 3 + 2] - pos[i * 3 + 2]) * CONFIG.springStrength;
+  }
+
+  applyForces();
+
+  const isFist = currentGesture === 'fist';
+  const damping = isFist ? 0.9 : CONFIG.damping;
+  for (let i = 0; i < N; i++) {
+    vel[i * 3] *= damping;
+    vel[i * 3 + 1] *= damping;
+    vel[i * 3 + 2] *= damping;
+    pos[i * 3] += vel[i * 3];
+    pos[i * 3 + 1] += vel[i * 3 + 1];
+    pos[i * 3 + 2] += vel[i * 3 + 2];
+  }
+
+  // Base rotation
+  const rotSpeed = isFist ? CONFIG.rotationSpeed * 3 : CONFIG.rotationSpeed;
+  const rotAngle = rotSpeed * dt;
+  const cosA = Math.cos(rotAngle), sinA = Math.sin(rotAngle);
+  for (let i = 0; i < N; i++) {
+    const x = pos[i * 3], z = pos[i * 3 + 2];
+    pos[i * 3] = x * cosA - z * sinA;
+    pos[i * 3 + 2] = x * sinA + z * cosA;
+    const tx = target[i * 3], tz = target[i * 3 + 2];
+    target[i * 3] = tx * cosA - tz * sinA;
+    target[i * 3 + 2] = tx * sinA + tz * cosA;
+  }
+
+  // Rotate background stars + twinkling
+  const sAngle = 0.005 * dt;
+  const sc = Math.cos(sAngle), ss = Math.sin(sAngle);
+  const starArr = starField.geometry.attributes.position.array;
+  for (let i = 0; i < CONFIG.starCount; i++) {
+    const x = starArr[i * 3], z = starArr[i * 3 + 2];
+    starArr[i * 3] = x * sc - z * ss;
+    starArr[i * 3 + 2] = x * ss + z * sc;
+  }
+  starField.geometry.attributes.position.needsUpdate = true;
+  // Global twinkle: subtle opacity pulse
+  starField.material.opacity = 0.55 + Math.sin(time * 0.15) * 0.08;
+  // Size pulse for bright stars
+  const brightPulse = 1 + Math.sin(time * 0.3) * 0.15;
+  if (brightStarSprites) {
+    for (let bi = 0; bi < brightStarSprites.length; bi++) {
+      const s = brightStarSprites[bi];
+      const base = s.userData.baseScale || 0.3;
+      const phase = s.userData.phase || 0;
+      const spd = s.userData.speed || 1;
+      const p = base * (0.7 + 0.3 * (1 + Math.sin(time * spd + phase)) / 2);
+      s.scale.set(p, p, 1);
+    }
+  }
+
+  // === Update main particle geometry ===
+  particleSystem.geo.attributes.position.needsUpdate = true;
+
+  // === Update connection lines ===
+  const linePos = lineGeometry.attributes.position.array;
+  const numLines = connections.length / 2;
+  for (let k = 0; k < numLines; k++) {
+    const i = connections[k * 2];
+    const j = connections[k * 2 + 1];
+    linePos[k * 6] = pos[i * 3];
+    linePos[k * 6 + 1] = pos[i * 3 + 1];
+    linePos[k * 6 + 2] = pos[i * 3 + 2];
+    linePos[k * 6 + 3] = pos[j * 3];
+    linePos[k * 6 + 4] = pos[j * 3 + 1];
+    linePos[k * 6 + 5] = pos[j * 3 + 2];
+  }
+  lineGeometry.attributes.position.needsUpdate = true;
+
+  // === Color cycling ===
+  const hue = (time * 0.02 + 0.05) % 1;
+  const particleColor = new THREE.Color().setHSL(hue, 0.85, 0.55);
+  particleSystem.mat.color.copy(particleColor);
+  const lineColor = new THREE.Color().setHSL((hue + 0.3) % 1, 0.5, 0.4);
+  lineMaterial.color.copy(lineColor);
+
+  // === Size pulsation ===
+  const pulse = 1 + Math.sin(time * 1.5) * 0.25;
+  particleSystem.mat.size = 0.15 * pulse;
+
+  // === ✨ GESTURE: ✌️ Peace → assemble "生日快乐" (also visible in cake mode) ===
+  const targetAssembly = (currentGesture === 'peace' || currentMorph === 'cake') ? 1 : 0;
+  textP.assemblyProgress += (targetAssembly - textP.assemblyProgress) * 0.045;
+
+  // Fade opacity based on assembly
+  textP.mat.opacity = Math.min(textP.assemblyProgress * 0.9, 0.85);
+
+  // Blend text particles between scatter and target positions
+  const t = textP.assemblyProgress;
+  const easedT = t * t * (3 - 2 * t); // smoothstep
+  const tp = textP.currentPos;
+  for (let i = 0; i < textP.count; i++) {
+    const idx = i * 3;
+    const tx = textP.targetPos[idx] * easedT + textP.scatterPos[idx] * (1 - easedT);
+    const ty = textP.targetPos[idx + 1] * easedT + textP.scatterPos[idx + 1] * (1 - easedT);
+    const tz = textP.targetPos[idx + 2] * easedT + textP.scatterPos[idx + 2] * (1 - easedT);
+
+    // Gentle floating motion when assembled
+    const floatY = Math.sin(time * 0.5 + i * 0.1) * 0.02 * easedT;
+    const floatX = Math.cos(time * 0.3 + i * 0.07) * 0.015 * easedT;
+
+    tp[idx] += (tx + floatX - tp[idx]) * 0.06;
+    tp[idx + 1] += (ty + floatY - tp[idx + 1]) * 0.06;
+    tp[idx + 2] += (tz - tp[idx + 2]) * 0.06;
+  }
+  textP.geo.attributes.position.needsUpdate = true;
+
+  // Slowly rotate text group when assembled
+  if (textP.assemblyProgress > 0.3) {
+    const tAngle = 0.005 * dt * 60 * textP.assemblyProgress;
+    const tCos = Math.cos(tAngle), tSin = Math.sin(tAngle);
+    for (let i = 0; i < textP.count; i++) {
+      const x = tp[i * 3], z = tp[i * 3 + 2];
+      tp[i * 3] = x * tCos - z * tSin;
+      tp[i * 3 + 2] = x * tSin + z * tCos;
+    }
+  }
+
+  // Change text color cycling when fully assembled
+  if (textP.assemblyProgress > 0.8) {
+    const th = (time * 0.04) % 1;
+    textP.mat.color.setHSL(th, 0.9, 0.6);
+  } else {
+    textP.mat.color.setHSL(0.08, 0.9, 0.55);
+  }
+
+  // === 🔥 GESTURE: ✊ Fist + cake mode → light candles ===
+  if (currentMorph === 'cake' && currentGesture === 'fist') {
+    const sizeArr = particleSystem.geo.attributes.size.array;
+    for (let ci = 0; ci < candleIndices.length; ci++) {
+      const ci3 = candleIndices[ci];
+      // Candles flicker: larger + pulsing
+      sizeArr[ci3] = baseSizes[ci3] * (1.5 + Math.sin(time * 4 + ci * 1.3) * 0.8 + Math.sin(time * 7 + ci * 2.1) * 0.4);
+    }
+    particleSystem.geo.attributes.size.needsUpdate = true;
+  } else if (currentMorph === 'cake') {
+    // Gentle idle candle glow (no fist)
+    const sizeArr = particleSystem.geo.attributes.size.array;
+    for (let ci = 0; ci < candleIndices.length; ci++) {
+      const ci3 = candleIndices[ci];
+      sizeArr[ci3] = baseSizes[ci3] * (1.0 + Math.sin(time * 2 + ci * 1.7) * 0.3);
+    }
+    particleSystem.geo.attributes.size.needsUpdate = true;
+  } else {
+    // Reset sizes when not cake mode
+    const sizeArr = particleSystem.geo.attributes.size.array;
+    for (let ci = 0; ci < candleIndices.length; ci++) {
+      sizeArr[candleIndices[ci]] = baseSizes[candleIndices[ci]];
+    }
+  }
+
+  // === Candle glow animation ===
+  candleGlow.material.opacity = 0.35 + Math.sin(time * 1.2) * 0.15;
+  const glowScale = 6 + Math.sin(time * 0.7) * 1.5;
+  candleGlow.scale.set(glowScale, glowScale, 1);
+
+  // === Confetti animation ===
+  const cPos = confettiPoints.geometry.attributes.position.array;
+  for (let i = 0; i < CONFETTI_COUNT; i++) {
+    cPos[i * 3] += confettiVel[i].x;
+    cPos[i * 3 + 1] += confettiVel[i].y;
+    cPos[i * 3 + 2] += confettiVel[i].z;
+    if (cPos[i * 3 + 1] < -6) {
+      resetConfettiParticle(i, false);
+    }
+  }
+  confettiPoints.geometry.attributes.position.needsUpdate = true;
+
+  // === Sparkle burst animation ===
+  const sPos = sparklePoints.geometry.attributes.position.array;
+  let anyAlive = false;
+  const sparkleColor = sparklePoints.material.color;
+  const sparkleHue = (time * 0.05) % 1;
+  sparkleColor.setHSL(sparkleHue, 1, 0.6);
+
+  for (let i = 0; i < SPARKLE_COUNT; i++) {
+    if (sparkleLife[i] > 0) {
+      sparkleLife[i] -= dt;
+      sPos[i * 3] += sparkleVel[i].x * dt * 60;
+      sPos[i * 3 + 1] += sparkleVel[i].y * dt * 60 + 0.002;
+      sPos[i * 3 + 2] += sparkleVel[i].z * dt * 60;
+      sparkleVel[i].x *= 0.97;
+      sparkleVel[i].y *= 0.97;
+      sparkleVel[i].z *= 0.97;
+      anyAlive = true;
+    } else {
+      sPos[i * 3 + 1] = -100;
+    }
+  }
+  sparklePoints.geometry.attributes.position.needsUpdate = true;
+  sparklePoints.material.opacity = anyAlive ? 0.7 : 0;
+
+  sparkleTimer += dt;
+  if (sparkleTimer > 2.5 + Math.random() * 1.5) {
+    triggerSparkleBurst();
+    sparkleTimer = 0;
+  }
+
+  // === Cinematic camera ===
+  const orbitR = 8;
+  const orbitSpeed = 0.04;
+  const bx = orbitR * Math.cos(time * orbitSpeed);
+  const bz = orbitR * Math.sin(time * orbitSpeed);
+  camera.position.x = bx + Math.sin(time * 0.7) * 0.4;
+  camera.position.y = 1.5 + Math.sin(time * 0.5) * 0.3 + Math.sin(time * 0.9) * 0.15;
+  camera.position.z = bz + Math.cos(time * 0.65) * 0.4;
+  camera.lookAt(0, 0, 0);
+
+  renderer.render(scene, camera);
+}
+
+// ============================================================
+// WINDOW RESIZE & FULLSCREEN
+// ============================================================
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+function toggleFullscreen() {
+  const btn = document.getElementById('fullscreen-btn');
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().then(() => {
+      btn.textContent = '⛶ 退出全屏';
+    }).catch(() => {});
+  } else {
+    document.exitFullscreen().then(() => {
+      btn.textContent = '⛶ 全屏';
+    }).catch(() => {});
+  }
+}
+
+document.addEventListener('fullscreenchange', () => {
+  const btn = document.getElementById('fullscreen-btn');
+  if (btn) btn.textContent = document.fullscreenElement ? '⛶ 退出全屏' : '⛶ 全屏';
+});
+
+// Click anywhere on canvas to toggle fullscreen
+renderer.domElement.addEventListener('dblclick', toggleFullscreen);
+
+// ============================================================
+// SPACE AMBIENT MUSIC (Web Audio API)
+// ============================================================
+let spaceAudio = null;
+let audioStarted = false;
+
+function initSpaceMusic() {
+  if (audioStarted) return;
+  audioStarted = true;
+
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const masterGain = ctx.createGain();
+    masterGain.gain.value = 0.5;
+    masterGain.connect(ctx.destination);
+
+    // --- Reverb (convolution with impulse) ---
+    function createReverb(time) {
+      const len = ctx.sampleRate * time;
+      const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+      for (let ch = 0; ch < 2; ch++) {
+        const d = buf.getChannelData(ch);
+        for (let i = 0; i < len; i++) {
+          d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (len * 0.3));
+        }
+      }
+      const conv = ctx.createConvolver();
+      conv.buffer = buf;
+      return conv;
+    }
+    const reverb = createReverb(3.0);
+    const reverbWet = ctx.createGain();
+    reverbWet.gain.value = 0.7;
+    reverb.connect(reverbWet);
+    reverbWet.connect(masterGain);
+
+    // --- Delay ---
+    const delay = ctx.createDelay(1.5);
+    delay.delayTime.value = 0.6;
+    const delayGain = ctx.createGain();
+    delayGain.gain.value = 0.25;
+    delay.connect(delayGain);
+    delayGain.connect(masterGain);
+    delayGain.connect(delay);
+
+    // --- Bass drone ---
+    const freqs = [55, 65, 82.5, 110];
+    const droneNodes = [];
+    freqs.forEach((f, i) => {
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = f;
+      const g = ctx.createGain();
+      g.gain.value = 0.02 + (i === 0 ? 0.03 : 0.01);
+      osc.connect(g);
+      // Send to reverb + delay
+      g.connect(reverb);
+      g.connect(delay);
+      g.connect(masterGain);
+      // Slow frequency modulation for warmth
+      const lfo = ctx.createOscillator();
+      lfo.type = 'sine';
+      lfo.frequency.value = 0.05 + Math.random() * 0.03;
+      const lfoG = ctx.createGain();
+      lfoG.gain.value = 0.3;
+      lfo.connect(lfoG);
+      lfoG.connect(osc.frequency);
+      lfo.start();
+      osc.start();
+      droneNodes.push(osc);
+    });
+
+    // --- Pad (shimmer) ---
+    const padOsc = ctx.createOscillator();
+    padOsc.type = 'triangle';
+    padOsc.frequency.value = 220;
+    const padGain = ctx.createGain();
+    padGain.gain.value = 0.015;
+    // LFO modulation
+    const padLfo = ctx.createOscillator();
+    padLfo.frequency.value = 0.15;
+    const padLfoG = ctx.createGain();
+    padLfoG.gain.value = 0.008;
+    padLfo.connect(padLfoG);
+    padLfoG.connect(padGain.gain);
+    padOsc.connect(padGain);
+    padGain.connect(reverb);
+    padGain.connect(delay);
+    padGain.connect(masterGain);
+    padOsc.start();
+    padLfo.start();
+
+    // Lower fifth for richness
+    const padOsc2 = ctx.createOscillator();
+    padOsc2.type = 'sine';
+    padOsc2.frequency.value = 110;
+    const padGain2 = ctx.createGain();
+    padGain2.gain.value = 0.02;
+    padOsc2.connect(padGain2);
+    padGain2.connect(reverb);
+    padGain2.connect(masterGain);
+    padOsc2.start();
+
+    // --- Shimmer noise ---
+    const bufSize = ctx.sampleRate * 2;
+    const noiseBuf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+    const nd = noiseBuf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) nd[i] = Math.random() * 2 - 1;
+    const noiseSrc = ctx.createBufferSource();
+    noiseSrc.buffer = noiseBuf;
+    noiseSrc.loop = true;
+    const noiseFilter = ctx.createBiquadFilter();
+    noiseFilter.type = 'bandpass';
+    noiseFilter.frequency.value = 4000;
+    noiseFilter.Q.value = 0.5;
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.value = 0.008;
+    const noiseLfo = ctx.createOscillator();
+    noiseLfo.frequency.value = 0.08;
+    const noiseLfoG = ctx.createGain();
+    noiseLfoG.gain.value = 0.005;
+    noiseLfo.connect(noiseLfoG);
+    noiseLfoG.connect(noiseGain.gain);
+    noiseSrc.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(reverb);
+    noiseGain.connect(masterGain);
+    noiseSrc.start();
+    noiseLfo.start();
+
+    // --- Occasional chime ---
+    let chimeTimer = 0;
+    function scheduleChime() {
+      const delay2 = 3 + Math.random() * 8;
+      chimeTimer = ctx.currentTime + delay2;
+      setTimeout(() => {
+        if (!audioStarted) return;
+        try {
+          const chimeOsc = ctx.createOscillator();
+          chimeOsc.type = 'sine';
+          // Random pentatonic note
+          const notes = [528, 660, 792, 880, 1056, 1320];
+          chimeOsc.frequency.value = notes[Math.floor(Math.random() * notes.length)];
+          const chimeGain = ctx.createGain();
+          chimeGain.gain.setValueAtTime(0, ctx.currentTime);
+          chimeGain.gain.linearRampToValueAtTime(0.04, ctx.currentTime + 0.05);
+          chimeGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 2.5);
+          // Add second harmonic
+          const chimeOsc2 = ctx.createOscillator();
+          chimeOsc2.type = 'sine';
+          chimeOsc2.frequency.value = chimeOsc.frequency.value * 2.01;
+          const chimeGain2 = ctx.createGain();
+          chimeGain2.gain.setValueAtTime(0, ctx.currentTime);
+          chimeGain2.gain.linearRampToValueAtTime(0.015, ctx.currentTime + 0.03);
+          chimeGain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.8);
+
+          chimeOsc.connect(chimeGain);
+          chimeOsc2.connect(chimeGain2);
+          chimeGain.connect(reverb);
+          chimeGain.connect(delay);
+          chimeGain.connect(masterGain);
+          chimeGain2.connect(reverb);
+          chimeGain2.connect(masterGain);
+          chimeOsc.start();
+          chimeOsc2.start();
+          chimeOsc.stop(ctx.currentTime + 3);
+          chimeOsc2.stop(ctx.currentTime + 2);
+        } catch(e) {}
+        scheduleChime();
+      }, delay2 * 1000);
+    }
+    scheduleChime();
+
+    spaceAudio = { ctx, masterGain, droneNodes };
+  } catch(e) {
+    console.warn('Audio init failed:', e);
+  }
+}
+
+// Start music on first user interaction
+function tryStartAudio() {
+  if (audioStarted) return;
+  initSpaceMusic();
+  const btn = document.getElementById('music-btn');
+  if (btn) btn.textContent = '♪ 音乐';
+}
+
+document.addEventListener('click', tryStartAudio, { once: true });
+document.addEventListener('touchstart', tryStartAudio, { once: true });
+
+// ============================================================
+// START
+// ============================================================
+animate();
+</script>
+</body>
+</html>
