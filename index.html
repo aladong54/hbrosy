@@ -1097,18 +1097,40 @@ const video = document.getElementById('webcam');
 const handCanvas = document.getElementById('hand-canvas');
 const handCtx = handCanvas.getContext('2d');
 
+const cameraStatus = document.querySelector('.camera-label');
+
 async function setupMediaPipe() {
   try {
-    await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js');
-    await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js');
+    cameraStatus.textContent = '📷 加载中...';
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: 640, height: 480, facingMode: 'user' }
-    });
+    // Try jsDelivr first, fall back to unpkg
+    try {
+      await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js');
+    } catch(e) {
+      console.warn('jsDelivr hands.js failed, trying unpkg...');
+      await loadScript('https://unpkg.com/@mediapipe/hands@0.4.1675469240/hands.js');
+    }
+    try {
+      await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js');
+    } catch(e) {
+      console.warn('jsDelivr camera_utils failed, trying unpkg...');
+      await loadScript('https://unpkg.com/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js');
+    }
+
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 640, height: 480, facingMode: 'user' }
+      });
+    } catch(e) {
+      cameraStatus.textContent = '📷 需要摄像头权限';
+      console.warn('Camera access denied:', e.message);
+      document.getElementById('loading').classList.add('hidden');
+      return;
+    }
     video.srcObject = stream;
     await video.play();
 
-    // Sync canvas size with actual video dimensions
     function syncCanvasSize() {
       const w = video.videoWidth || 640;
       const h = video.videoHeight || 480;
@@ -1132,8 +1154,10 @@ async function setupMediaPipe() {
     hands.onResults((results) => {
       if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
         handLandmarks = results.multiHandLandmarks[0];
+        cameraStatus.textContent = '📷 手势已识别 ✓';
       } else {
         handLandmarks = null;
+        cameraStatus.textContent = '📷 请伸出手掌';
       }
       drawHand(handCtx, handLandmarks, handCanvas.width, handCanvas.height);
     });
@@ -1147,9 +1171,11 @@ async function setupMediaPipe() {
     });
     camera.start();
 
+    cameraStatus.textContent = '📷 摄像头就绪';
     document.getElementById('loading').classList.add('hidden');
   } catch (err) {
     console.warn('MediaPipe/Camera init failed:', err);
+    cameraStatus.textContent = '📷 手势不可用，请用鼠标';
     document.getElementById('loading').classList.add('hidden');
   }
 }
